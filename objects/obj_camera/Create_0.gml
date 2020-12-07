@@ -1,6 +1,3 @@
-#macro Camera obj_camera
-
-
 port = {
     width : 1280,
     height : 720,
@@ -52,7 +49,7 @@ view = {
     width : 480,
     height : 270,
     aspect : 1,
-    scale : .9,
+    scale : .7,
     
     // Update the view every step
     Update : function(canvas) {

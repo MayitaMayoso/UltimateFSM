@@ -62,6 +62,9 @@
 				
 				if (is_method(self.current.StepEndEvent))
 					self.current.StepEndEvent();
+				
+				if (is_method(self.current.StateTransitions))
+					self.current.StateTransitions();
 					
 				if ( self.next != -1 ) {
 					if (is_method(self.current.StateEndEvent))
@@ -210,6 +213,7 @@
 		self.DrawGUIEndEvent = function() {};
 		self.DrawPreEvent = function() {};
 		self.DrawPostEvent = function() {};
+		self.StateTransitions = function() {};
 	};
 
 #endregion

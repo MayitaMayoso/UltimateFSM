@@ -4,6 +4,8 @@ FSM.StepEvent();
 hdir = keyboard_check(vk_right) - keyboard_check(vk_left);
 vdir = keyboard_check(vk_down) - (keyboard_check(vk_up) || keyboard_check(vk_space));
 if (vdir>=0) jreleased = true;
+grab = keyboard_check(ord("Z"));
+if (!grab) grabreleased = true;
 
 // Horizontal Collisions
 if (CheckTileCollision(x + hspd, y, LEVEL.WALL)) {
@@ -15,14 +17,37 @@ if (CheckTileCollision(x + hspd, y, LEVEL.WALL)) {
 
 // Vertical Collisions
 if (CheckTileCollision(x, y + vspd, LEVEL.WALL)) {
-	while(!CheckTileCollision(x, y + sign(vspd), LEVEL.WALL)) {
-		y += sign(vspd);
+	// Correct position in corners when falling
+	var corrected = false;
+	if ( vspd<0 ) {
+		var dir = 1;
+		repeat(2) {
+			var off = 0;
+			while(CheckTileCollision(x+off, y + vspd, LEVEL.WALL) && abs(off) < collisionOffset) {
+				off += dir;
+			}
+			if (abs(off)<collisionOffset) {
+				x+=off;
+				corrected = true;
+				break;
+			}
+			dir = -1;
+		}
 	}
-	vspd = 0;
+	
+	// Adjust position to collision
+	if (!corrected) {
+		while(!CheckTileCollision(x, y + sign(vspd), LEVEL.WALL)) {
+			y += sign(vspd);
+		}
+		vspd = 0;
+		}
 }
 
 // One way collision
-if (vspd>0 && FSM.current.name != "Ladder") {
+if (vspd>0 && FSM.current.name != "Ladder" && vdir<=0) {
+	
+	// Adjust position to collision
 	if (!CheckTileCollision(x, y, LEVEL.LADDER) && CheckTileCollision(x, y + vspd, LEVEL.LADDER)) {
 		while(!CheckTileCollision(x, y + 1, LEVEL.LADDER)) {
 			y ++;
