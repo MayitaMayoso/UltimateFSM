@@ -2,11 +2,11 @@
   "isDnD": false,
   "isCompatibility": false,
   "parent": {
-    "name": "Scripts",
-    "path": "folders/Scripts.yy",
+    "name": "UltimateFSM",
+    "path": "UltimateFSM.yyp",
   },
   "resourceVersion": "1.0",
-  "name": "FiniteStateMachine",
+  "name": "PLATFORM_MACROS",
   "tags": [],
   "resourceType": "GMScript",
 }

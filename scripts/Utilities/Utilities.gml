@@ -80,3 +80,43 @@ function Wrap(value, minimum, maximum) {
 	while(value < minimum) value += range;
 	return value;
 };
+
+function CheckTileCollision(xpos, ypos, value) {
+	var tile = layer_tilemap_get_id(layer_get_id("Level"));
+	var xmov = xpos - x;
+	var ymov = ypos - y;
+	var b_right = x - (sprite_get_xoffset(sprite_index) - sprite_get_bbox_right(sprite_index)) + xmov;
+	var b_left = x - (sprite_get_xoffset(sprite_index) - sprite_get_bbox_left(sprite_index)) + xmov;
+	var b_top = y - (sprite_get_yoffset(sprite_index) - sprite_get_bbox_top(sprite_index)) + ymov;
+	var b_bottom = y - (sprite_get_yoffset(sprite_index) - sprite_get_bbox_bottom(sprite_index)) + ymov;
+	
+	var check = 0;
+	
+	check += (tilemap_get_at_pixel(tile, b_right, b_top) == value);
+	check += (tilemap_get_at_pixel(tile, b_left, b_top) == value);
+	check += (tilemap_get_at_pixel(tile, b_right, b_bottom) == value);
+	check += (tilemap_get_at_pixel(tile, b_left, b_bottom) == value);
+	// check += (tilemap_get_at_pixel(tile, b_right, ypos) == value);
+	// check += (tilemap_get_at_pixel(tile, xpos, b_top) == value);
+	// check += (tilemap_get_at_pixel(tile, xpos, b_bottom) == value);
+	// check += (tilemap_get_at_pixel(tile, b_left, ypos) == value);
+	// check += (tilemap_get_at_pixel(tile, xpos, ypos) == value);
+	
+	return (sign(check));
+};
+
+function CheckTilePixel(xpos, ypos, value) {
+	var tile = layer_tilemap_get_id(layer_get_id("Level"));
+	return (tilemap_get_at_pixel(tile, xpos, ypos) == value);
+};
+
+
+
+
+
+
+
+
+
+
+

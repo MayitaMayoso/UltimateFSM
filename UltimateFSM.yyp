@@ -1,10 +1,16 @@
 {
   "resources": [
+    {"id":{"name":"spr_level","path":"sprites/spr_level/spr_level.yy",},"order":2,},
     {"id":{"name":"Utilities","path":"scripts/Utilities/Utilities.yy",},"order":0,},
-    {"id":{"name":"obj_test","path":"objects/obj_test/obj_test.yy",},"order":1,},
+    {"id":{"name":"ts_level","path":"tilesets/ts_level/ts_level.yy",},"order":4,},
+    {"id":{"name":"obj_player","path":"objects/obj_player/obj_player.yy",},"order":5,},
     {"id":{"name":"FiniteStateMachine","path":"scripts/FiniteStateMachine/FiniteStateMachine.yy",},"order":1,},
-    {"id":{"name":"spr_test","path":"sprites/spr_test/spr_test.yy",},"order":2,},
-    {"id":{"name":"rm_test","path":"rooms/rm_test/rm_test.yy",},"order":0,},
+    {"id":{"name":"obj_camera","path":"objects/obj_camera/obj_camera.yy",},"order":4,},
+    {"id":{"name":"PLATFORM_MACROS","path":"scripts/PLATFORM_MACROS/PLATFORM_MACROS.yy",},"order":2,},
+    {"id":{"name":"spr_camera","path":"sprites/spr_camera/spr_camera.yy",},"order":0,},
+    {"id":{"name":"spr_player","path":"sprites/spr_player/spr_player.yy",},"order":1,},
+    {"id":{"name":"spr_sky","path":"sprites/spr_sky/spr_sky.yy",},"order":3,},
+    {"id":{"name":"rm_test","path":"rooms/rm_test/rm_test.yy",},"order":3,},
   ],
   "Options": [
     {"name":"HTML5","path":"options/html5/options_html5.yy",},
@@ -24,7 +30,8 @@
     {"roomId":{"name":"rm_test","path":"rooms/rm_test/rm_test.yy",},},
   ],
   "Folders": [
-    {"folderPath":"folders/Agustin's folder.yy","order":3,"resourceVersion":"1.0","name":"Agustin's folder","tags":[],"resourceType":"GMFolder",},
+    {"folderPath":"folders/Scripts.yy","order":1,"resourceVersion":"1.0","name":"Scripts","tags":[],"resourceType":"GMFolder",},
+    {"folderPath":"folders/Sprites.yy","order":0,"resourceVersion":"1.0","name":"Sprites","tags":[],"resourceType":"GMFolder",},
   ],
   "AudioGroups": [
     {"targets":461609314234257646,"resourceVersion":"1.0","name":"audiogroup_default","resourceType":"GMAudioGroup",},

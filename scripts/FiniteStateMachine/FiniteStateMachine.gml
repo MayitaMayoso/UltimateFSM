@@ -1,5 +1,9 @@
 #region FINITE STATE MACHINE
 	#macro FSM_HISTORY_MAX 10
+	#macro RIGHT 0
+	#macro TOP 1
+	#macro LEFT 2
+	#macro BOTTOM 3
 
 	function FiniteStateMachine() constructor {
 		self.instance = other;
@@ -14,6 +18,8 @@
 		self.framesInState = 0;
 		self.millisecondsInState = 0;
 		self.timeOnStateBegin = current_time;
+		
+		self.direction = RIGHT;
 		
 		#region FSM EVENTS
 		
@@ -74,7 +80,7 @@
 				if ( !self.statesSize ) return;
 				var inst = self.instance;
 				draw_sprite_ext(
-								self.current.sprite, self.framesInState,
+								self.current.sprite[self.direction], self.framesInState,
 								inst.x, inst.y, inst.image_xscale, inst.image_yscale,
 								inst.image_angle, inst.image_blend, inst.image_alpha
 								);
@@ -138,12 +144,15 @@
 			function Set(state) {
 				for( var i=0 ; i<self.statesSize ; i++ ) {
 					if ( string_upper(self.states[|i].name) == string_upper(state) ) {
+						// If we already selected a state on this frame to change reverse the change
+						if (self.next != -1)
+							self.Previous();
 						// Update the states history. If the size of the history exceeded we will pop.
 						if (self.current != -1) {
 							ds_list_insert(self.history, 0, self.current);
 							self.historySize++;
 						}
-						if ( ds_list_size(self.history) > FSM_HISTORY_MAX && FSM_HISTORY_MAX == -1 ) {
+						if ( ds_list_size(self.history) > FSM_HISTORY_MAX && FSM_HISTORY_MAX != -1 ) {
 							ds_list_delete(self.history, self.historySize-1);
 							self.historySize--;
 						}
@@ -186,6 +195,7 @@
 		self.name = name;
 		self.fsm.Register(self);
 		self.sprite = DefaultValue(sprite, -1);
+		if (!is_array(self.sprite)) self.sprite = [self.sprite];
 		
 		self.StateBeginEvent = function() {};
 		self.StateEndEvent = function() {};
