@@ -10,6 +10,7 @@
 		self.states = ds_list_create();
 		self.statesSize = 0;
 		
+		self.name = "";
 		self.current = -1;
 		self.next = -1;
 		self.history = ds_list_create();
@@ -69,6 +70,7 @@
 				if ( self.next != -1 ) {
 					if (is_method(self.current.StateEndEvent))
 						self.current.StateEndEvent();
+					self.name = self.next.name;
 				}
 			};
 			

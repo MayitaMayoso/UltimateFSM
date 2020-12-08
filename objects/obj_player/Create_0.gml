@@ -2,7 +2,7 @@
 enum LEVEL {
 	EMPTY,
 	WALL,
-	LADDER
+	LADDER = 99
 }
 
 #region Physics
@@ -23,6 +23,9 @@ enum LEVEL {
 	
 	wallDir = 0;
 	ladderX = 0;
+	
+	plummetSpd = 5;
+	plummetTime = 8;
 
 #endregion
 
@@ -51,10 +54,10 @@ enum LEVEL {
 	};
 	
 	idleState.StateTransitions = function() {
-	    if (hdir!=0 && !CheckTileCollision(x + hdir, y, LEVEL.WALL)) FSM.Set("Run");
+	    if (hdir!=0 && !CheckGround(hdir, 0)) FSM.Set("Run");
 	    if (vdir<0 && jreleased) FSM.Set("Jump");
-	    if (!CheckTileCollision(x, y + 1, LEVEL.WALL) && !CheckTileCollision(x, y + 1, LEVEL.LADDER)) FSM.Set("Coyote");
-	    if (CheckTileCollision(x, y + vdir, LEVEL.LADDER) && (vdir!=0)) FSM.Set("Ladder");
+	    if (!CheckGround(0, 1)) FSM.Set("Coyote");
+	    if (CheckLadder(0, 1) && (vdir>0)) FSM.Set("Ladder");
 	};
 	
 	// ===============================================
@@ -69,8 +72,8 @@ enum LEVEL {
 	runState.StateTransitions = function() {
 	    if (hspd==0 && hdir==0) FSM.Set("Idle");
 	    if (vdir<0 && jreleased) FSM.Set("Jump");
-	    if (!CheckTileCollision(x, y + 1, LEVEL.WALL) && !CheckTileCollision(x, y + 1, LEVEL.LADDER)) FSM.Set("Coyote");
-	    if (CheckTileCollision(x, y+vdir, LEVEL.LADDER) && (vdir!=0)) FSM.Set("Ladder");
+	    if (!CheckGround(0, 1)) FSM.Set("Coyote");
+	    if (CheckLadder(0, 1) && (vdir>0)) FSM.Set("Ladder");
 	};
 	
 	// ===============================================
@@ -83,11 +86,12 @@ enum LEVEL {
 	};
 	
 	coyoteState.StateTransitions = function() {
-	    if (grab && (CheckTileCollision(x + 1, y, LEVEL.WALL) || CheckTileCollision(x - 1, y, LEVEL.WALL))) FSM.Set("Wall");
+	    if (grab && (CheckGround(1, 0) || CheckGround(-1, 0))) FSM.Set("Wall");
+	    if (vdir > 0) FSM.Set("Plummet");
 	    if (vspd==0) FSM.Set((hdir==0)?"Idle":"Run");
 	    if (FSM.framesInState > 5) FSM.Set("Fall");
 	    if (vdir<0 && jreleased) FSM.Set("Jump");
-	    if (vdir!=0 && jreleased && CheckTileCollision(x, y + vdir, LEVEL.LADDER)) FSM.Set("Ladder");
+	    if (vdir!=0 && jreleased && CheckLadder()) FSM.Set("Ladder");
 	};
 	
 	// ===============================================
@@ -100,9 +104,33 @@ enum LEVEL {
 	};
 	
 	fallState.StateTransitions = function() {
-	    if (grab && (CheckTileCollision(x + 1, y, LEVEL.WALL) || CheckTileCollision(x - 1, y, LEVEL.WALL))) FSM.Set("Wall");
+	    if (grab && (CheckGround(1, 0) || CheckGround(-1, 0))) FSM.Set("Wall");
+	    if (vdir > 0) FSM.Set("Plummet");
 	    if (vspd==0) FSM.Set((hdir==0)?"Idle":"Run");
-	    if (vdir!=0 && jreleased && CheckTileCollision(x, y + vdir, LEVEL.LADDER)) FSM.Set("Ladder");
+	    if (vdir!=0 && jreleased && CheckLadder()) FSM.Set("Ladder");
+	};
+	
+	// ===============================================
+	// ---------------- Plummet state ----------------
+	// ===============================================
+	var plummetState = new State("Plummet", spr_player);
+	plummetState.StateBeginEvent = function() {
+		hspd = 0;
+		vspd = 0;
+		image_angle = 360;
+	};
+	
+	plummetState.StepEvent = function() {
+		if (FSM.framesInState == plummetTime) {
+			vspd = plummetSpd;
+			image_angle = 0;
+		} else {
+			image_angle = lerp(image_angle, 0, 0.3);
+		}
+	};
+	
+	plummetState.StateTransitions = function() {
+	    if (vspd==0 && FSM.framesInState>plummetTime) FSM.Set("Idle");
 	};
 	
 	// ===============================================
@@ -122,8 +150,9 @@ enum LEVEL {
 	
 	jumpState.StateTransitions = function() {
 	    if (vspd > 0) FSM.Set("Fall");
-	    if (grab && (CheckTileCollision(x + 1, y, LEVEL.WALL) || CheckTileCollision(x - 1, y, LEVEL.WALL))) FSM.Set("Wall");
-	    if (vdir!=0 && jreleased && CheckTileCollision(x, y, LEVEL.LADDER)) FSM.Set("Ladder");
+	    if (vdir > 0) FSM.Set("Plummet");
+	    if (grab && (CheckGround(1, 0) || CheckGround(-1, 0))) FSM.Set("Wall");
+	    if (vdir!=0 && jreleased && CheckLadder()) FSM.Set("Ladder");
 	};
 	
 	// ===============================================
@@ -134,7 +163,7 @@ enum LEVEL {
 	ladderState.StateBeginEvent = function() {
 		y += vdir;
 		hspd = 0;
-		var ladderDir = (CheckTileCollision(x + 16, y, LEVEL.LADDER) - CheckTileCollision(x - 16, y, LEVEL.LADDER));
+		var ladderDir = (CheckLadder(16, 0) - CheckLadder(-16, 0));
 		ladderX = 8 + 16*((x + 8 * ladderDir) div 16);
 	};
 	
@@ -147,14 +176,18 @@ enum LEVEL {
 	};
 	
 	ladderState.StateEndEvent = function() {
-		vspd = 0;
 		jreleased = false;
+		while(CheckLadder()) {
+			x += sign(hspd);
+			y += sign(vspd);
+		}
+		vspd = 0;
 	};
 	
 	ladderState.StateTransitions = function() {
-	    if (!CheckTileCollision(x, y, LEVEL.LADDER)) {
+	    if (!CheckLadder(hspd, vspd)) {
 	    	FSM.Set("Idle");
-	    	if (!CheckTileCollision(x, y + 1, LEVEL.WALL) && !CheckTileCollision(x, y + 1, LEVEL.LADDER)) FSM.Set("Fall");
+	    	if (!CheckGround(0, 1) && !CheckLadder(0, 1)) FSM.Set("Fall");
 	    }
 	};
 	
@@ -164,7 +197,7 @@ enum LEVEL {
 	var wallState = new State("Wall", spr_player);
 	
 	wallState.StateBeginEvent = function() {
-		wallDir = CheckTileCollision(x + 1, y, LEVEL.WALL) - CheckTileCollision(x - 1, y, LEVEL.WALL);
+		wallDir = CheckGround(1, 0) - CheckGround(-1, 0);
 		grabreleased = false;
 		if (vspd>0) vspd = 0;
 	};
@@ -174,8 +207,8 @@ enum LEVEL {
 	};
 	
 	wallState.StateTransitions = function() {
-		if (!grab || !CheckTileCollision(x + wallDir, y, LEVEL.WALL)) FSM.Set("Fall");
-		if (CheckTileCollision(x, y + 1, LEVEL.WALL)) FSM.Set("Idle");
+		if (!grab || !CheckGround(wallDir, 0)) FSM.Set("Fall");
+		if (CheckGround(0, 1)) FSM.Set("Idle");
 		if (vdir<0 && jreleased) FSM.Set("WallJump");
 	};
 	
@@ -185,23 +218,48 @@ enum LEVEL {
 	var wallJumpState = new State("WallJump", spr_player);
 	
 	wallJumpState.StateBeginEvent = function() {
-		hspd = spd * -wallDir;
+		hspd = 2*jumpforce * -wallDir;
 		vspd = -jumpforce;
 		jreleased = false;
 	};
 	
 	wallJumpState.StepEvent = function() {
-		hspd = Approach(hspd, spd * hdir, acc);
+		hspd = Approach(hspd, spd * hdir, abs(hdir)?groundAcc:groundFricc);
 		vspd += grav;
 	};
 	
 	wallJumpState.StateTransitions = function() {
 	    if (vspd > 0) FSM.Set("Fall");
-	    if (grab && CheckTileCollision(x + hdir, y, LEVEL.WALL)) FSM.Set("Wall");
-	    if (CheckTileCollision(x, y+vdir, LEVEL.LADDER) && (vdir!=0)) FSM.Set("Ladder");
+	    if (vdir > 0) FSM.Set("Plummet");
+	    if (grab && (CheckGround(1, 0) || CheckGround(-1, 0))) FSM.Set("Wall");
+	    if (CheckLadder() && (vdir!=0)) FSM.Set("Ladder");
 	};
 
 	// Setting Run as the first state
 	FSM.Set("Idle");
+
+#endregion
+
+#region Checkers
+
+	groundTile = layer_tilemap_get_id(layer_get_id("Ground"));
+	laddersTile = layer_tilemap_get_id(layer_get_id("Ladders"));
+
+	CheckGround = function(xmov, ymov) {
+		xmov = DefaultValue(xmov, 0);
+		ymov = DefaultValue(ymov, 0);
+		var ground = CheckTileCollision(x+xmov, y+ymov, groundTile);
+		var ladder = (	ymov >0 && FSM.name != "Ladder"
+						&& CheckTileCollision(x+xmov, y+ymov, laddersTile)
+						&& !CheckTileCollision(x, y, laddersTile) );
+						
+		return (ground || ladder);
+	};
+	
+	CheckLadder = function(xmov, ymov) {
+		xmov = DefaultValue(xmov, 0);
+		ymov = DefaultValue(ymov, 0);
+		return CheckTileCollision(x+xmov, y+ymov, laddersTile);
+	};
 
 #endregion
