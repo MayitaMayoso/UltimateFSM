@@ -1,9 +1,6 @@
 #region FINITE STATE MACHINE
 	#macro FSM_HISTORY_MAX 10
-	#macro RIGHT 0
-	#macro TOP 1
-	#macro LEFT 2
-	#macro BOTTOM 3
+	#macro DEBUG false
 
 	function FiniteStateMachine() constructor {
 		self.instance = other;
@@ -13,6 +10,7 @@
 		self.name = "";
 		self.current = -1;
 		self.next = -1;
+		self.previous = -1;
 		self.history = ds_list_create();
 		self.historySize = 0;
 		
@@ -20,7 +18,15 @@
 		self.millisecondsInState = 0;
 		self.timeOnStateBegin = current_time;
 		
-		self.direction = RIGHT;
+		self.image = {
+			direction : 1,
+			facing : 1,
+			xscale : 1,
+			yscale : 1,
+			rotation : 0,
+			alpha : 1,
+			blend : c_white
+		};
 		
 		#region FSM EVENTS
 		
@@ -30,11 +36,11 @@
 				// If a new state is selected
 				if ( self.next != -1 ) {
 					// Set the new state and call its State Begin Event
+					self.previous = self.current;
 					self.current = self.next;
 					self.next = -1;
 					
-					if (is_method(self.current.StateBeginEvent))
-						self.current.StateBeginEvent();
+					self.current.StateBeginEvent();
 					
 					// Reset the timers
 					self.framesInState = 0;
@@ -46,30 +52,28 @@
 					self.millisecondsInState = current_time - self.timeOnStateBegin;
 				}
 				
-				if (is_method(self.current.StepBeginEvent))
-					self.current.StepBeginEvent();
+				self.current.animation.Update();
+				if (self.current.animation.started) self.current.AnimationBeginEvent();
+				if (self.current.animation.finished) self.current.AnimationEndEvent();
+				
+				self.current.StepBeginEvent();
 			};
 			
 			// Call this method on the Step Event of your instance
 			function StepEvent() {
 				if ( !self.statesSize ) return;
 				
-					self.current.StepEvent();
+				self.current.StepEvent();
 			};
 			
 			// Call this method on the Step End Event of your instance
 			function StepEndEvent() {
 				if ( !self.statesSize ) return;
 				
-				if (is_method(self.current.StepEndEvent))
-					self.current.StepEndEvent();
-				
-				if (is_method(self.current.StateTransitions))
-					self.current.StateTransitions();
+				self.current.StepEndEvent();
 					
 				if ( self.next != -1 ) {
-					if (is_method(self.current.StateEndEvent))
-						self.current.StateEndEvent();
+					self.current.StateEndEvent();
 					self.name = self.next.name;
 				}
 			};
@@ -83,12 +87,19 @@
 			// Call this method on the Step End Event of your instance
 			function DrawEvent() {
 				if ( !self.statesSize ) return;
-				var inst = self.instance;
-				draw_sprite_ext(
-								self.current.sprite[self.direction], self.framesInState,
-								inst.x, inst.y, inst.image_xscale, inst.image_yscale,
-								inst.image_angle, inst.image_blend, inst.image_alpha
-								);
+				if (self.current.animation.sprite != -1) {
+					var spr = self.current.animation.sprite;
+					if (is_array(spr)) spr = spr[min(self.direction, array_length(spr)-1)];
+					draw_sprite_ext(
+									spr , self.current.animation.frame,
+									self.instance.x, self.instance.y,
+									self.image.facing * self.instance.image_xscale * self.image.xscale,
+									self.instance.image_yscale * self.image.yscale,
+									self.instance.image_angle + self.image.rotation,
+									merge_color(self.instance.image_blend, self.image.blend, .5),
+									self.instance.image_alpha * self.image.alpha
+									);
+				}
 				self.current.DrawEvent();
 			};
 			
@@ -137,6 +148,11 @@
 			function Register(state) {
 				ds_list_add(self.states, state);
 				self.statesSize++;
+			};
+			
+			function Get(state) {
+				for( var i=0 ; i<self.statesSize ; i++ )
+					if ( string_upper(self.states[|i].name) == string_upper(state) ) return self.states[|i];
 			};
 		
 			// Call this method on the cleanup event of your instance or you might get a memory leak
@@ -194,13 +210,64 @@
 
 #region STATE
 
-	function State(name, sprite) constructor {
+	function State(name) constructor {
 		self.instance = other;
 		self.fsm = self.instance.FSM;
 		self.name = name;
 		self.fsm.Register(self);
-		self.sprite = DefaultValue(sprite, -1);
-		if (!is_array(self.sprite)) self.sprite = [self.sprite];
+		
+		self.animation = {
+			sprite : -1,
+			speed : 1,
+			loop : true,
+			frame :0,
+			rawFrame : 0,
+			number : 1,
+			lastUpdate : current_time,
+			started : false,
+			finished : false,
+			
+			Init : function(sprite, speed, loop) {
+				self.sprite = sprite;
+				self.speed = DefaultValue(speed, 1);
+				self.loop = DefaultValue(loop, true);
+				self.number = sprite_get_number(sprite);
+			},
+			
+			Update : function() {
+				if (self.fsm.framesInState==0) {
+					self.rawFrame = 0;
+					self.frame = 0;
+					self.lastUpdate = current_time;
+					self.started = true;
+					self.finished = false;
+					if (DEBUG) Print("============", self.fsm.current.name);
+				} else {
+					var delta = current_time - self.lastUpdate;
+					var msPerFrame = 1000 / (self.speed * game_get_speed(gamespeed_fps));
+					var deltaFrame = delta / msPerFrame;
+					
+					self.rawFrame += deltaFrame;
+					var prevFrame = self.frame;
+					self.frame = floor(rawFrame);
+					
+					if (self.frame >= self.number) {
+						if (self.loop) self.rawFrame = self.rawFrame % self.number;
+						else self.rawFrame = min(self.frame, self.number-1);
+						
+						self.frame = floor(rawFrame);
+					}
+					
+					self.started = (self.frame==0 && prevFrame!=0);
+					self.finished = ( self.rawFrame + deltaFrame*1.3 >= self.number );
+					
+					self.lastUpdate = current_time;
+					if (DEBUG) Print(self.frame, self.finished);
+				}
+			}
+		};
+		
+		self.animation.fsm = self.fsm;
 		
 		self.StateBeginEvent = function() {};
 		self.StateEndEvent = function() {};
@@ -215,7 +282,8 @@
 		self.DrawGUIEndEvent = function() {};
 		self.DrawPreEvent = function() {};
 		self.DrawPostEvent = function() {};
-		self.StateTransitions = function() {};
+		self.AnimationBeginEvent = function() {};
+		self.AnimationEndEvent = function() {};
 	};
 
 #endregion

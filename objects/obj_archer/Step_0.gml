@@ -1,11 +1,17 @@
-FSM.StepEvent();
-
 // Controls
 hdir = keyboard_check(vk_right) - keyboard_check(vk_left);
 vdir = keyboard_check(vk_down) - (keyboard_check(vk_up) || keyboard_check(vk_space));
 if (vdir>=0) jreleased = true;
 grab = keyboard_check(ord("Z"));
 if (!grab) grabreleased = true;
+chargeArrowReleased = !chargeArrow;
+chargeArrow = keyboard_check(ord("X"));
+
+FSM.image.xscale = lerp(FSM.image.xscale, 1, 0.1);
+FSM.image.yscale = lerp(FSM.image.yscale, 1, 0.1);
+if (hspd!=0) FSM.image.facing = sign(hspd);
+
+FSM.StepEvent();
 
 // Horizontal Collisions
 if (CheckGround(hspd, 0)) {

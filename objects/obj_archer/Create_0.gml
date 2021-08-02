@@ -4,7 +4,8 @@ enum LEVEL {
 	WALL,
 	LADDER = 99
 }
-
+image_xscale = .7;
+image_yscale = .7;
 #region Physics
 
 	hspd = 0;
@@ -16,15 +17,15 @@ enum LEVEL {
 	airAcc = 0.2;
 	airFricc = 0.02;
 	
-	spd = 3;
-	grav = 0.15;
-	jumpforce = 3.5;
+	spd = 2;
+	grav = 0.05;
+	jumpforce = 2.5;
 	collisionOffset = 8;
 	
 	wallDir = 0;
 	ladderX = 0;
 	
-	plummetSpd = 5;
+	plummetSpd = 3.4;
 	plummetTime = 8;
 
 #endregion
@@ -36,6 +37,8 @@ enum LEVEL {
 	jreleased = true;
 	grab = false;
 	grabreleased = true;
+	chargeArrow = false;
+	chargeArrowReleased = true;
 
 #endregion
 
@@ -44,103 +47,122 @@ enum LEVEL {
 	// Creating the FSM component
 	FSM = new FiniteStateMachine();
 	
+	FSM.DirectionFunc = function() {
+		if (hdir!=0) FSM.direction = sign(hdir);
+	};
+	
 	// ===============================================
 	// ---------------- Idle state -------------------
 	// ===============================================
-	var idleState = new State("Idle", spr_player);
+	idleState = new State("Idle");
+	idleState.animation.Init(spr_archer_idle, .25);
 	
 	idleState.StepEvent = function() {
 		hspd = Approach(hspd, spd * hdir, abs(hdir)?groundAcc:groundFricc);
 	};
 	
-	idleState.StateTransitions = function() {
+	idleState.StepEndEvent = function() {
+		if (chargeArrow && chargeArrowReleased) FSM.Set("ArrowCharge");
 	    if (hdir!=0 && !CheckGround(hdir, 0)) FSM.Set("Run");
 	    if (vdir<0 && jreleased) FSM.Set("Jump");
-	    if (!CheckGround(0, 1)) FSM.Set("Coyote");
-	    if (CheckLadder(0, 1) && (vdir>0)) FSM.Set("Ladder");
+	    if (!CheckGround(0, 1)) FSM.Set("Fall");
+	    if (CheckLadder(0, vdir) && (vdir!=0)) FSM.Set("Ladder");
+	};
+	
+	// ===============================================
+	// ---------------- Land state -------------------
+	// ===============================================
+	landState = new State("Land");
+	landState.animation.Init(spr_archer_land, .25);
+	
+	landState.StateBeginEvent = function() {
+		FSM.image.xscale = 1.2;
+		FSM.image.yscale = 0.8;
+	};
+	
+	landState.StepEvent = function() {
+		if (FSM.previous.name != "Plummet")
+			hspd = Approach(hspd, spd * hdir, abs(hdir)?groundAcc:groundFricc);
+	};
+	
+	landState.StepEndEvent = function() {
+		if (landState.animation.finished) FSM.Set("Idle");
+		if (hdir!=0 && FSM.previous.name != "Plummet") FSM.Set("Run");
+		if (chargeArrow && chargeArrowReleased && FSM.previous.name != "Plummet") FSM.Set("ArrowCharge");
+	    if (vdir<0 && jreleased) FSM.Set("Jump");
 	};
 	
 	// ===============================================
 	// ---------------- Running state ----------------
 	// ===============================================
-	var runState = new State("Run", spr_player);
+	runState = new State("Run");
+	runState.animation.Init(spr_archer_run, .2);
 	
 	runState.StepEvent = function() {
 		hspd = Approach(hspd, spd * hdir, abs(hdir)?groundAcc:groundFricc);
+		runState.animation.speed = .2 * abs(hspd) / spd;
 	};
 	
-	runState.StateTransitions = function() {
-	    if (hspd==0 && hdir==0) FSM.Set("Idle");
+	runState.StepEndEvent = function() {
+	    if (hdir==0 && hspd==0) FSM.Set("Idle");
+		if (chargeArrow && chargeArrowReleased) FSM.Set("ArrowCharge");
 	    if (vdir<0 && jreleased) FSM.Set("Jump");
-	    if (!CheckGround(0, 1)) FSM.Set("Coyote");
-	    if (CheckLadder(0, 1) && (vdir>0)) FSM.Set("Ladder");
-	};
-	
-	// ===============================================
-	// ---------------- Coyote state ----------------
-	// ===============================================
-	var coyoteState = new State("Coyote", spr_player);
-	coyoteState.StepEvent = function() {
-		hspd = Approach(hspd, spd * hdir, abs(hdir)?airAcc:airFricc);
-		vspd += grav;
-	};
-	
-	coyoteState.StateTransitions = function() {
-	    if (grab && (CheckGround(1, 0) || CheckGround(-1, 0))) FSM.Set("Wall");
-	    if (vdir > 0) FSM.Set("Plummet");
-	    if (vspd==0) FSM.Set((hdir==0)?"Idle":"Run");
-	    if (FSM.framesInState > 5) FSM.Set("Fall");
-	    if (vdir<0 && jreleased) FSM.Set("Jump");
-	    if (vdir!=0 && jreleased && CheckLadder()) FSM.Set("Ladder");
+	    if (!CheckGround(0, 1)) FSM.Set("Fall");
+	    if (CheckLadder(0, vdir) && (vdir!=0)) FSM.Set("Ladder");
 	};
 	
 	// ===============================================
 	// ---------------- Falling state ----------------
 	// ===============================================
-	var fallState = new State("Fall", spr_player);
+	fallState = new State("Fall");
+	fallState.animation.Init(spr_archer_fall, .1, false);
+	
 	fallState.StepEvent = function() {
 		hspd = Approach(hspd, spd * hdir, abs(hdir)?airAcc:airFricc);
 		vspd += grav;
 	};
 	
-	fallState.StateTransitions = function() {
+	fallState.StepEndEvent = function() {
 	    if (grab && (CheckGround(1, 0) || CheckGround(-1, 0))) FSM.Set("Wall");
 	    if (vdir > 0) FSM.Set("Plummet");
-	    if (vspd==0) FSM.Set((hdir==0)?"Idle":"Run");
+	    if (vdir < 0 && FSM.framesInState < 8 && IsIn(FSM.previous.name,["Idle","Run"])) FSM.Set("Jump");
+	    if (vspd==0 && CheckGround(0, 1)) FSM.Set((hdir==0)?"Land":"Run");
 	    if (vdir!=0 && jreleased && CheckLadder()) FSM.Set("Ladder");
+		if (chargeArrow && chargeArrowReleased) FSM.Set("ArrowCharge");
 	};
 	
 	// ===============================================
 	// ---------------- Plummet state ----------------
 	// ===============================================
-	var plummetState = new State("Plummet", spr_player);
+	plummetState = new State("Plummet");
+	plummetState.animation.Init(spr_archer_plummet, .4, false);
+	
 	plummetState.StateBeginEvent = function() {
 		hspd = 0;
 		vspd = 0;
-		image_angle = 360;
 	};
 	
-	plummetState.StepEvent = function() {
-		if (FSM.framesInState == plummetTime) {
-			vspd = plummetSpd;
-			image_angle = 0;
-		} else {
-			image_angle = lerp(image_angle, 0, 0.3);
-		}
+	plummetState.AnimationEndEvent = function() {
+		vspd = plummetSpd;
 	};
 	
-	plummetState.StateTransitions = function() {
-	    if (vspd==0 && FSM.framesInState>plummetTime) FSM.Set("Idle");
+	plummetState.StepEndEvent = function() {
+		FSM.image.xscale = .9;
+		FSM.image.yscale = 1.1;
+	    if (vspd==0 && plummetState.animation.finished) FSM.Set("Land");
 	};
 	
 	// ===============================================
 	// ---------------- Jumping state ----------------
 	// ===============================================
-	var jumpState = new State("Jump", spr_player);
+	jumpState = new State("Jump");
+	jumpState.animation.Init(spr_archer_jump, .15, false);
 	
 	jumpState.StateBeginEvent = function() {
 		vspd -= jumpforce;
 		jreleased = false;
+		FSM.image.xscale = 0.8;
+		FSM.image.yscale = 1.2;
 	};
 	
 	jumpState.StepEvent = function() {
@@ -148,17 +170,19 @@ enum LEVEL {
 		vspd = min(1, vspd + grav*(1 + jreleased));
 	};
 	
-	jumpState.StateTransitions = function() {
+	jumpState.StepEndEvent = function() {
 	    if (vspd > 0) FSM.Set("Fall");
 	    if (vdir > 0) FSM.Set("Plummet");
 	    if (grab && (CheckGround(1, 0) || CheckGround(-1, 0))) FSM.Set("Wall");
 	    if (vdir!=0 && jreleased && CheckLadder()) FSM.Set("Ladder");
+		if (chargeArrow && chargeArrowReleased) FSM.Set("ArrowCharge");
 	};
 	
 	// ===============================================
 	// ---------------- Ladder state -----------------
 	// ===============================================
-	var ladderState = new State("Ladder", spr_player);
+	ladderState = new State("Ladder");
+	ladderState.animation.Init(spr_archer_idle, 0);
 	
 	ladderState.StateBeginEvent = function() {
 		y += vdir;
@@ -184,7 +208,7 @@ enum LEVEL {
 		vspd = 0;
 	};
 	
-	ladderState.StateTransitions = function() {
+	ladderState.StepEndEvent = function() {
 	    if (!CheckLadder(hspd, vspd)) {
 	    	FSM.Set("Idle");
 	    	if (!CheckGround(0, 1) && !CheckLadder(0, 1)) FSM.Set("Fall");
@@ -194,7 +218,8 @@ enum LEVEL {
 	// ===============================================
 	// ---------------- Wall state ---------------
 	// ===============================================
-	var wallState = new State("Wall", spr_player);
+	wallState = new State("Wall");
+	wallState.animation.Init(spr_archer_idle, 0);
 	
 	wallState.StateBeginEvent = function() {
 		wallDir = CheckGround(1, 0) - CheckGround(-1, 0);
@@ -206,7 +231,7 @@ enum LEVEL {
 		vspd += (vspd<0)?grav:grav/4;
 	};
 	
-	wallState.StateTransitions = function() {
+	wallState.StepEndEvent = function() {
 		if (!grab || !CheckGround(wallDir, 0)) FSM.Set("Fall");
 		if (CheckGround(0, 1)) FSM.Set("Idle");
 		if (vdir<0 && jreleased) FSM.Set("WallJump");
@@ -215,12 +240,15 @@ enum LEVEL {
 	// ===============================================
 	// ---------------- WallJump state ---------------
 	// ===============================================
-	var wallJumpState = new State("WallJump", spr_player);
+	wallJumpState = new State("WallJump");
+	wallJumpState.animation.Init(spr_archer_jump, .25, false);
 	
 	wallJumpState.StateBeginEvent = function() {
 		hspd = 2*jumpforce * -wallDir;
 		vspd = -jumpforce;
 		jreleased = false;
+		FSM.image.xscale = 1.5;
+		FSM.image.yscale = 0.5;
 	};
 	
 	wallJumpState.StepEvent = function() {
@@ -228,16 +256,59 @@ enum LEVEL {
 		vspd += grav;
 	};
 	
-	wallJumpState.StateTransitions = function() {
+	wallJumpState.StepEndEvent = function() {
 	    if (vspd > 0) FSM.Set("Fall");
 	    if (vdir > 0) FSM.Set("Plummet");
 	    if (grab && (CheckGround(1, 0) || CheckGround(-1, 0))) FSM.Set("Wall");
 	    if (CheckLadder() && (vdir!=0)) FSM.Set("Ladder");
+		if (chargeArrow && chargeArrowReleased) FSM.Set("ArrowCharge");
+	};
+	
+	// ===============================================
+	// -------------- Arrow charge state -------------
+	// ===============================================
+	arrowChargeState = new State("ArrowCharge");
+	arrowChargeState.animation.Init(spr_archer_arrow_charge, .25, false);
+	
+	arrowChargeState.StepEvent = function() {
+		hspd = Approach(hspd, 0, groundFricc);
+		vspd += grav;
+	};
+	
+	arrowChargeState.StepEndEvent = function() {
+		if (!chargeArrow) {
+			if (arrowChargeState.animation.frame==arrowChargeState.animation.number-1) FSM.Set("ArrowRelease");
+			else {
+				FSM.Set(abs(hdir)?"Run":"Idle");
+	    		if (!CheckGround(0, 1)) FSM.Set("Fall");
+			}
+		}
+	};
+	
+	// ===============================================
+	// -------------- Arrow release state ------------
+	// ===============================================
+	arrowReleaseState = new State("ArrowRelease");
+	arrowReleaseState.animation.Init(spr_archer_arrow_release, .2, false);
+	
+	arrowReleaseState.StepEvent = function() {
+		hspd = Approach(hspd, 0, groundFricc);
+	};
+	
+	arrowReleaseState.StateBeginEvent = function() {
+		var arr = instance_create_depth(x + 8*FSM.image.facing, y-14, depth-1, obj_arrow);
+		arr.dir = FSM.image.facing;
+	};
+	
+	arrowReleaseState.AnimationEndEvent = function() {
+		FSM.Set(abs(hdir)?"Run":"Idle");
+	    if (!CheckGround(0, 1)) FSM.Set("Fall");
 	};
 
 	// Setting Run as the first state
 	FSM.Set("Idle");
-
+	
+	
 #endregion
 
 #region Checkers

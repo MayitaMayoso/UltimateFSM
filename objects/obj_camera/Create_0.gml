@@ -50,13 +50,14 @@ view = {
     height : 270,
     aspect : 1,
     scale : .7,
+	fixedWidth : 1,
+	fixedHeight : 1,
     
     // Update the view every step
     Update : function(canvas) {
         // Resize the view
         aspect = canvas.width / canvas.height;
-        var fixedWidth, fixedHeight;
-        if ( aspect > 1 ) {
+        if ( true ) {
             fixedWidth = width;
             fixedHeight = width / aspect;
         } else {
